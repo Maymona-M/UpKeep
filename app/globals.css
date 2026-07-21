@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/600.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
+@theme {
+  /* Core UpKeep palette */
+  --color-ink: #06202b;
+  --color-ink-soft: #0d3541;
+  --color-teal: #077a7d;
+  --color-teal-soft: #0a9599;
+  --color-mint: #7ae2cf;
+  --color-mint-soft: #a7ecdf;
+  --color-cream: #fdeb9e;
+  --color-cream-soft: #fef3c2;
+
+  /* Derived, used sparingly for the one state the core palette doesn't
+     cover on its own: overdue urgency. Same warm family as cream, pushed
+     toward amber so it reads as "further along the same warning". */
+  --color-amber: #f2a93b;
+  --color-amber-soft: #f7c476;
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-mint-soft);
+  font-family: var(--font-body);
+}
+
+::selection {
+  background: var(--color-teal);
+  color: var(--color-ink);
+}
+
+/* Visible keyboard focus everywhere - never suppressed. */
+:focus-visible {
+  outline: 2px solid var(--color-mint);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
