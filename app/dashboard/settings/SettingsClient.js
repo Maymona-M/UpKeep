@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, RefreshCw, Copy, Plus, X } from "lucide-react";
+import { ArrowLeft, RefreshCw, Copy, Plus, X, QrCode } from "lucide-react";
+import FamilyLinkQr from "@/components/FamilyLinkQr";
 
 export default function SettingsClient({ initialEmails, initialViewToken }) {
   const [emails, setEmails] = useState(initialEmails.length ? initialEmails : [""]);
@@ -12,6 +13,7 @@ export default function SettingsClient({ initialEmails, initialViewToken }) {
   const [viewToken, setViewToken] = useState(initialViewToken);
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -116,6 +118,13 @@ export default function SettingsClient({ initialEmails, initialViewToken }) {
             <Copy size={15} /> {copied ? "Copied!" : "Copy link"}
           </button>
           <button
+            onClick={() => setShowQr((v) => !v)}
+            className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium border"
+            style={{ borderColor: "var(--color-mint)", color: "var(--color-mint-soft)" }}
+          >
+            <QrCode size={15} /> {showQr ? "Hide QR code" : "Show QR code"}
+          </button>
+          <button
             onClick={regenerateLink}
             disabled={regenerating}
             className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium border disabled:opacity-50"
@@ -124,6 +133,14 @@ export default function SettingsClient({ initialEmails, initialViewToken }) {
             <RefreshCw size={15} /> {regenerating ? "Regenerating…" : "Regenerate link"}
           </button>
         </div>
+        {showQr && (
+          <div className="mt-4">
+            <FamilyLinkQr url={shareUrl} />
+            <p className="text-xs mt-1.5" style={{ color: "var(--color-mint)" }}>
+              Scan to open on a phone, or print it for the fridge.
+            </p>
+          </div>
+        )}
       </section>
 
       {/* Notification emails */}

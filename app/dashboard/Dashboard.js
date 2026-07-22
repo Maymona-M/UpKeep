@@ -14,11 +14,16 @@ import {
   Settings as SettingsIcon,
   LogOut,
   CalendarClock,
+  Search,
+  ArrowUpDown,
+  Download,
+  QrCode,
 } from "lucide-react";
 import CategoryIcon from "@/components/CategoryIcon";
 import DueChip from "@/components/DueChip";
 import ObligationModal from "@/components/ObligationModal";
 import ConfirmNextModal from "@/components/ConfirmNextModal";
+import FamilyLinkQr from "@/components/FamilyLinkQr";
 import { categoryMeta } from "@/lib/categories";
 
 const FILTERS = [
@@ -39,6 +44,42 @@ function matchesFilter(o, filter) {
   return true;
 }
 
+function matchesSearch(o, query) {
+  if (!query.trim()) return true;
+  const q = query.trim().toLowerCase();
+  return (
+    o.title.toLowerCase().includes(q) ||
+    categoryMeta(o.category).label.toLowerCase().includes(q) ||
+    (o.notes || "").toLowerCase().includes(q)
+  );
+}
+
+const SORT_OPTIONS = [
+  { key: "dueDate", label: "Due date" },
+  { key: "title", label: "Title" },
+  { key: "category", label: "Category" },
+];
+
+function sortObligations(list, sortBy, sortDir) {
+  const sorted = [...list].sort((a, b) => {
+    let av, bv;
+    if (sortBy === "title") {
+      av = a.title.toLowerCase();
+      bv = b.title.toLowerCase();
+    } else if (sortBy === "category") {
+      av = categoryMeta(a.category).label.toLowerCase();
+      bv = categoryMeta(b.category).label.toLowerCase();
+    } else {
+      av = a.dueDate;
+      bv = b.dueDate;
+    }
+    if (av < bv) return -1;
+    if (av > bv) return 1;
+    return 0;
+  });
+  return sortDir === "desc" ? sorted.reverse() : sorted;
+}
+
 export default function Dashboard({ initialObligations, viewToken }) {
   const router = useRouter();
   const [obligations, setObligations] = useState(initialObligations);
@@ -48,6 +89,10 @@ export default function Dashboard({ initialObligations, viewToken }) {
   const [linkOpen, setLinkOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("dueDate");
+  const [sortDir, setSortDir] = useState("asc");
+  const [showQr, setShowQr] = useState(false);
 
   const shareUrl =
     typeof window !== "undefined" && viewToken ? `${window.location.origin}/view/${viewToken}` : "";
@@ -68,7 +113,11 @@ export default function Dashboard({ initialObligations, viewToken }) {
     return active.length ? active[0] : null; // already sorted by dueDate from the server
   }, [obligations]);
 
-  const visible = obligations.filter((o) => matchesFilter(o, filter));
+  const visible = sortObligations(
+    obligations.filter((o) => matchesFilter(o, filter) && matchesSearch(o, searchQuery)),
+    sortBy,
+    sortDir
+  );
 
   function upsertLocal(updated) {
     setObligations((prev) => {
@@ -131,6 +180,12 @@ export default function Dashboard({ initialObligations, viewToken }) {
     });
   }
 
+  function exportCsv() {
+    // Straight browser download of the /api/obligations/export CSV route -
+    // no client-side CSV building needed, the server already generated it.
+    window.location.href = "/api/obligations/export";
+  }
+
   return (
     <main className="min-h-screen pb-24">
       <header
@@ -173,22 +228,39 @@ export default function Dashboard({ initialObligations, viewToken }) {
       {linkOpen && (
         <div className="px-4 sm:px-8 pt-4">
           <div
-            className="rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+            className="rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-start gap-4"
             style={{ borderColor: "var(--color-teal)", background: "var(--color-ink-soft)" }}
           >
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium mb-1" style={{ color: "var(--color-mint)" }}>
                 Private read-only link for family members — no account needed
               </p>
-              <p className="font-mono text-sm truncate text-white">{shareUrl || "Loading…"}</p>
+              <p className="font-mono text-sm truncate text-white mb-3">{shareUrl || "Loading…"}</p>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={copyLink}
+                  className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium shrink-0"
+                  style={{ background: "var(--color-teal)", color: "white" }}
+                >
+                  <Copy size={15} /> {copied ? "Copied!" : "Copy link"}
+                </button>
+                <button
+                  onClick={() => setShowQr((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium border shrink-0"
+                  style={{ borderColor: "var(--color-mint)", color: "var(--color-mint-soft)" }}
+                >
+                  <QrCode size={15} /> {showQr ? "Hide QR code" : "Show QR code"}
+                </button>
+              </div>
             </div>
-            <button
-              onClick={copyLink}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium shrink-0"
-              style={{ background: "var(--color-teal)", color: "white" }}
-            >
-              <Copy size={15} /> {copied ? "Copied!" : "Copy link"}
-            </button>
+            {showQr && (
+              <div className="shrink-0">
+                <FamilyLinkQr url={shareUrl} />
+                <p className="text-center text-xs mt-1.5" style={{ color: "var(--color-mint)" }}>
+                  Scan to open on a phone
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -212,7 +284,7 @@ export default function Dashboard({ initialObligations, viewToken }) {
           </div>
         )}
 
-        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <div className="flex gap-1.5 flex-wrap">
             {FILTERS.map((f) => (
               <button
@@ -231,13 +303,64 @@ export default function Dashboard({ initialObligations, viewToken }) {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setModal({ mode: "create" })}
-            className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium"
-            style={{ background: "var(--color-cream)", color: "var(--color-ink)" }}
-          >
-            <Plus size={16} /> Add obligation
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportCsv}
+              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium border"
+              style={{ borderColor: "var(--color-ink-soft)", color: "var(--color-mint-soft)" }}
+              title="Download all obligations as CSV"
+            >
+              <Download size={15} /> <span className="hidden sm:inline">Export CSV</span>
+            </button>
+            <button
+              onClick={() => setModal({ mode: "create" })}
+              className="flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-medium"
+              style={{ background: "var(--color-cream)", color: "var(--color-ink)" }}
+            >
+              <Plus size={16} /> Add obligation
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <div className="relative flex-1 min-w-[180px]">
+            <Search
+              size={15}
+              className="absolute left-3 top-1/2 -translate-y-1/2"
+              style={{ color: "var(--color-mint)" }}
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search title, category, or notes…"
+              className="w-full rounded-xl pl-9 pr-3 py-2 text-sm text-white border outline-none"
+              style={{ background: "var(--color-ink-soft)", borderColor: "var(--color-ink-soft)" }}
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown size={14} style={{ color: "var(--color-mint)" }} />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="rounded-xl px-2.5 py-2 text-sm border outline-none"
+              style={{ background: "var(--color-ink-soft)", borderColor: "var(--color-ink-soft)", color: "var(--color-mint-soft)" }}
+            >
+              {SORT_OPTIONS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  Sort: {s.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+              className="rounded-xl px-2.5 py-2 text-sm border"
+              style={{ background: "var(--color-ink-soft)", borderColor: "var(--color-ink-soft)", color: "var(--color-mint-soft)" }}
+              title={sortDir === "asc" ? "Ascending" : "Descending"}
+            >
+              {sortDir === "asc" ? "↑" : "↓"}
+            </button>
+          </div>
         </div>
 
         {visible.length === 0 ? (
@@ -248,7 +371,9 @@ export default function Dashboard({ initialObligations, viewToken }) {
             <CalendarClock className="mx-auto mb-3" size={28} color="var(--color-teal-soft)" />
             <p className="font-display text-lg text-white mb-1">Nothing here yet</p>
             <p className="text-sm" style={{ color: "var(--color-mint)" }}>
-              {filter === "all"
+              {searchQuery.trim()
+                ? `No obligations match "${searchQuery.trim()}".`
+                : filter === "all"
                 ? "Add the first deadline your household needs to keep visible."
                 : "Nothing matches this filter right now."}
             </p>
