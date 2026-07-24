@@ -1,5 +1,5 @@
 import { getCollection } from "@/lib/mongodb";
-import { getSettings } from "@/lib/settings";
+import { findUserByViewToken } from "@/lib/users";
 import { todayStr } from "@/lib/dates";
 import { serializePublicObligation } from "@/lib/obligations";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 
 export default async function PublicViewPage({ params }) {
   const { token } = await params;
-  const settings = await getSettings();
+  const user = await findUserByViewToken(token);
 
-  if (!settings.viewToken || token !== settings.viewToken) {
+  if (!user) {
     return (
       <main className="min-h-screen flex items-center justify-center px-6 text-center">
         <div>
@@ -27,7 +27,7 @@ export default async function PublicViewPage({ params }) {
   }
 
   const col = await getCollection("obligations");
-  const docs = await col.find({}).sort({ dueDate: 1 }).toArray();
+  const docs = await col.find({ ownerId: user._id.toString() }).sort({ dueDate: 1 }).toArray();
   const today = todayStr();
   const obligations = docs.map((d) => serializePublicObligation(d, today));
   const active = obligations.filter((o) => o.computedStatus !== "done");

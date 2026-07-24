@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getCollection } from "@/lib/mongodb";
 import { todayStr } from "@/lib/dates";
+import { getServerSession } from "@/lib/auth";
 import {
   validateObligationInput,
   serializeObligation,
@@ -17,18 +18,24 @@ function parseId(id) {
 }
 
 export async function GET(request, { params }) {
+  const session = await getServerSession();
+  if (!session) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
   const { id } = await params;
   const _id = parseId(id);
   if (!_id) return NextResponse.json({ error: "Invalid id." }, { status: 400 });
 
   const col = await getCollection("obligations");
-  const doc = await col.findOne({ _id });
+  const doc = await col.findOne({ _id, ownerId: session.userId });
   if (!doc) return NextResponse.json({ error: "Obligation not found." }, { status: 404 });
 
   return NextResponse.json({ obligation: serializeObligation(doc, todayStr()) });
 }
 
 export async function PATCH(request, { params }) {
+  const session = await getServerSession();
+  if (!session) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
   const { id } = await params;
   const _id = parseId(id);
   if (!_id) return NextResponse.json({ error: "Invalid id." }, { status: 400 });
@@ -44,7 +51,7 @@ export async function PATCH(request, { params }) {
     const clean = validateObligationInput(body, { partial: true });
     const col = await getCollection("obligations");
     const result = await col.findOneAndUpdate(
-      { _id },
+      { _id, ownerId: session.userId },
       { $set: { ...clean, updatedAt: new Date() } },
       { returnDocument: "after" }
     );
@@ -59,18 +66,19 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(request, { params }) {
+  const session = await getServerSession();
+  if (!session) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
   const { id } = await params;
   const _id = parseId(id);
   if (!_id) return NextResponse.json({ error: "Invalid id." }, { status: 400 });
 
   const col = await getCollection("obligations");
-  const result = await col.deleteOne({ _id });
+  const result = await col.deleteOne({ _id, ownerId: session.userId });
   if (result.deletedCount === 0) {
     return NextResponse.json({ error: "Obligation not found." }, { status: 404 });
   }
 
-  // Clean up reminder logs so a future obligation reusing timing doesn't
-  // inherit stale "already sent" state (harmless either way, but tidy).
   const logs = await getCollection("reminderLogs");
   await logs.deleteMany({ obligationId: id });
 

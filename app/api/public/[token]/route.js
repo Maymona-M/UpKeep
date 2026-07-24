@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
 import { getCollection } from "@/lib/mongodb";
-import { getSettings } from "@/lib/settings";
+import { findUserByViewToken } from "@/lib/users";
 import { todayStr } from "@/lib/dates";
 import { serializePublicObligation } from "@/lib/obligations";
 
-// GET /api/public/[token] - read-only, no login. Security is the token
-// itself: long, random, and never guessable or enumerable. Anything
-// sensitive (passport numbers, policy numbers, payment info) is never
-// stored in the first place, so there's nothing sensitive to leak here.
+// GET /api/public/[token] - read-only, no login. The token identifies
+// exactly one household's owner; only their obligations are returned.
 export async function GET(request, { params }) {
   const { token } = await params;
-  const settings = await getSettings();
+  const user = await findUserByViewToken(token);
 
-  if (!settings.viewToken || token !== settings.viewToken) {
+  if (!user) {
     return NextResponse.json({ error: "Link not found." }, { status: 404 });
   }
 
   const col = await getCollection("obligations");
-  const docs = await col.find({}).sort({ dueDate: 1 }).toArray();
+  const docs = await col.find({ ownerId: user._id.toString() }).sort({ dueDate: 1 }).toArray();
   const today = todayStr();
   return NextResponse.json({
     obligations: docs.map((d) => serializePublicObligation(d, today)),

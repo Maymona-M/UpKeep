@@ -1,13 +1,23 @@
-import { getSettings } from "@/lib/settings";
+import { redirect } from "next/navigation";
+import { getServerSession } from "@/lib/auth";
+import { findUserById, publicUser } from "@/lib/users";
 import SettingsClient from "./SettingsClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const settings = await getSettings();
+  const session = await getServerSession();
+  if (!session) redirect("/login");
+
+  const user = await findUserById(session.userId);
+  if (!user) redirect("/login");
+
+  const settings = publicUser(user);
+
   return (
     <SettingsClient
-      initialEmails={settings.notificationEmails || []}
+      email={settings.email}
+      initialEmails={settings.notificationEmails}
       initialViewToken={settings.viewToken}
     />
   );

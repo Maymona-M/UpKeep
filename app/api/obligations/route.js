@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 import { getCollection } from "@/lib/mongodb";
 import { todayStr } from "@/lib/dates";
+import { getServerSession } from "@/lib/auth";
 import {
   validateObligationInput,
   serializeObligation,
   ValidationError,
 } from "@/lib/obligations";
 
-// GET /api/obligations - list every obligation, newest due date first isn't
-// as useful as soonest-due first, so we sort by dueDate ascending.
+// GET /api/obligations - list every obligation belonging to the logged-in
+// user's household only. Sorted soonest-due first.
 export async function GET() {
+  const session = await getServerSession();
+  if (!session) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
   try {
     const col = await getCollection("obligations");
-    const docs = await col.find({}).sort({ dueDate: 1 }).toArray();
+    const docs = await col.find({ ownerId: session.userId }).sort({ dueDate: 1 }).toArray();
     const today = todayStr();
     return NextResponse.json({ obligations: docs.map((d) => serializeObligation(d, today)) });
   } catch (err) {
@@ -20,8 +24,11 @@ export async function GET() {
   }
 }
 
-// POST /api/obligations - create a new obligation.
+// POST /api/obligations - create a new obligation, owned by the logged-in user.
 export async function POST(request) {
+  const session = await getServerSession();
+  if (!session) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
   let body;
   try {
     body = await request.json();
@@ -35,6 +42,7 @@ export async function POST(request) {
     const now = new Date();
     const doc = {
       ...clean,
+      ownerId: session.userId,
       recurring: clean.recurring || false,
       recurrence: clean.recurring ? clean.recurrence : null,
       reminderOffsets: clean.reminderOffsets || null,

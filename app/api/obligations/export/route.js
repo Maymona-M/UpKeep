@@ -1,5 +1,7 @@
+import { NextResponse } from "next/server";
 import { getCollection } from "@/lib/mongodb";
 import { todayStr } from "@/lib/dates";
+import { getServerSession } from "@/lib/auth";
 import { serializeObligation } from "@/lib/obligations";
 
 function csvEscape(value) {
@@ -21,12 +23,14 @@ const COLUMNS = [
   "lastConfirmedAt",
 ];
 
-// GET /api/obligations/export - downloadable CSV backup of every obligation.
-// Protected by middleware.js (matches /api/obligations/:path*), same as the
-// rest of the admin API - no separate auth check needed here.
+// GET /api/obligations/export - downloadable CSV backup of the logged-in
+// user's own obligations only.
 export async function GET() {
+  const session = await getServerSession();
+  if (!session) return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+
   const col = await getCollection("obligations");
-  const docs = await col.find({}).sort({ dueDate: 1 }).toArray();
+  const docs = await col.find({ ownerId: session.userId }).sort({ dueDate: 1 }).toArray();
   const today = todayStr();
   const rows = docs.map((d) => serializeObligation(d, today));
 

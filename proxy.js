@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { SESSION_COOKIE } from "@/lib/auth";
 
-async function hasValidSession(request) {
+async function getSessionUserId(request) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return false;
+  if (!token) return null;
   const secret = process.env.SESSION_SECRET;
-  if (!secret) return false;
+  if (!secret) return null;
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-    return payload?.role === "admin";
+    return payload?.sub || null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -20,16 +20,15 @@ export async function proxy(request) {
 
   const isProtectedPage = pathname.startsWith("/dashboard");
   const isProtectedApi =
-    pathname.startsWith("/api/obligations") ||
-    (pathname.startsWith("/api/settings") && !pathname.startsWith("/api/settings/public"));
+    pathname.startsWith("/api/obligations") || pathname.startsWith("/api/settings");
 
   if (!isProtectedPage && !isProtectedApi) {
     return NextResponse.next();
   }
 
-  const authed = await hasValidSession(request);
+  const userId = await getSessionUserId(request);
 
-  if (authed) return NextResponse.next();
+  if (userId) return NextResponse.next();
 
   if (isProtectedApi) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
