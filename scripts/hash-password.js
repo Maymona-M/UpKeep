@@ -13,3 +13,5 @@ bcrypt.hash(password, 12).then((hash) => {
   console.log("\nAdd this line to your .env file:\n");
   console.log(`ADMIN_PASSWORD_HASH=${hash}\n`);
 });
+
+
